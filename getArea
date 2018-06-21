@@ -1,0 +1,223 @@
+<template>
+  <div class="hello">
+     <el-cascader
+     :options="cascaderList"
+      v-model="varSelectedOptions"
+      @change="handleChange"
+     >
+    </el-cascader>
+   <!-- <p>11{{areaAdcode}}</p> -->
+  </div>
+</template>
+
+<script>
+import { GetDistrict_API } from "@/api/AreaAPI";
+
+export default {
+  name: 'getArea',
+  props: ['areaAdcode','syncAdcode'],
+  // props: ['areaAdcode'],
+  data() {
+    return {
+      tempData: null,
+      value: "",
+      cascaderList: [],
+      areavalue: [],
+      area: {
+        coding: [], //编码
+        chinName: [] //中文名称
+      },
+      //编号
+      form: {
+        province: "", //省编号
+        city: "",
+        region: ""
+      }
+    };
+  },
+  created() {
+    console.log("created");
+    this.GetDistrict("中国");
+  },
+  methods: {
+    //省市区三级联动
+    GetDistrict(keywords) {
+      console.log("GetDistrict:" + keywords);
+      console.log("test");
+      GetDistrict_API(keywords)
+        .then(response => {
+          if (response.data != null) {
+            if (response.data["districts"] != null) {
+              if (response.data["districts"][0] != null) {
+                // console.log(response.data["districts"][0]["districts"]);
+                this.tempData = response.data["districts"][0]["districts"];
+                //将省的值循环输入cascaderList
+                for (var i = 0; i < this.tempData.length; i++) {
+                  //判断是否存在下级区域
+                  if (this.tempData[i].districts.length != 0) {
+                    this.cascaderList.push({
+                      label: this.tempData[i].name,
+                      value: this.tempData[i].adcode,
+                      children: []
+                    });
+                    //将市的值循环输入cascaderList.districts
+                    for (
+                      var a = 0;
+                      a < this.tempData[i].districts.length;
+                      a++
+                    ) {
+                      //判断是否存在下级区域
+                      if (this.tempData[i].districts[a].districts.length != 0) {
+                        this.cascaderList[i].children.push({
+                          label: this.tempData[i].districts[a].name,
+                          value: this.tempData[i].districts[a].adcode,
+                          children: []
+                        });
+                        for (
+                          var c = 0;
+                          c < this.tempData[i].districts[a].districts.length;
+                          c++
+                        ) {
+                          this.cascaderList[i].children[a].children.push({
+                            label: this.tempData[i].districts[a].districts[c]
+                              .name,
+                            value: this.tempData[i].districts[a].districts[c]
+                              .adcode
+                          });
+                        }
+                      } else {
+                        // console.log(this.tempData[i].districts[a].name);
+                        this.cascaderList[i].children.push({
+                          label: this.tempData[i].districts[a].name,
+                          value: this.tempData[i].districts[a].adcode
+                        });
+                      }
+                    }
+                  } else {
+                    this.cascaderList.push({
+                      label: this.tempData[i].name,
+                      value: this.tempData[i].adcode
+                    });
+                  }
+                }
+              }
+            }
+          }
+        })
+        .catch(function(error) {
+          console.log(error);
+        });
+    },
+    //获取所选省市区的编码与名称
+    handleChange(value) {
+      this.getTransition(value);
+      console.log("this.varSelectedOptions");
+      console.log(this.varSelectedOptions);
+      this.form.province = this.varSelectedOptions[0];
+      this.form.city = this.varSelectedOptions[1];
+      this.form.region = this.varSelectedOptions[2];
+      this.area.coding = this.varSelectedOptions;
+      // console.log("this.area.coding");
+      // console.log(this.area.coding);
+
+      //获取省的名称
+      for (var i = 0; i < this.cascaderList.length; i++) {
+        if (this.cascaderList[i].value == this.form.province) {
+          this.area.chinName[0] = this.cascaderList[i].label;
+          break;
+        }
+      }
+
+      //获取城市名称
+      for (var y in this.cascaderList) {
+        for (var z in this.cascaderList[y].children) {
+          if (
+            this.cascaderList[y].children[z].value == this.form.city &&
+            this.form.city != undefined
+          ) {
+            this.area.chinName[1] = this.cascaderList[y].children[z].label;
+            break;
+          }
+        }
+      }
+
+      //获取区名称
+      for (var y in this.cascaderList) {
+        for (var z in this.cascaderList[y].children) {
+          for (var i in this.cascaderList[y].children[z].children) {
+            if (
+              this.cascaderList[y].children[z].children[i].value ==
+                this.form.region &&
+              this.form.region != undefined
+            ) {
+              // this.area.regionName = this.cascaderList[y].children[z].children[i].label;
+              this.area.chinName[2] = this.cascaderList[y].children[z].children[
+                i
+              ].label;
+            }
+          }
+        }
+      }
+
+      if (this.area.coding.length != 3) {
+        if (this.area.coding.length == 2) {
+          this.area.chinName.splice(2, 1);
+        } else if (this.area.coding.length == 1) {
+          this.area.chinName.splice(1, 2);
+        } else {
+          console.log("ok");
+        }
+      } else {
+        console.log("ok");
+      }
+      console.log("areavalue");
+      console.log(this.area);
+      this.$emit("areavalue", this.area);
+    },
+    //转换字符串，使其返回字符串值
+    getTransition(value) {
+      this.varSelectedOptions.splice(0, this.varSelectedOptions.length);
+      for (var i = 0; i < value.length; i++) {
+        this.varSelectedOptions.push(value[i].toString());
+      }
+    },
+    getFormat() {
+      console.log("getFormatthis.areaAdcode");
+      console.log(this.areaAdcode);
+      var str = this.areaAdcode;
+      str = str.replace(/\"/g, ""); //去掉双引号
+      str = str.replace(/\s/g, ""); //去掉文中空格
+      var str1 = str.split(","); //将其转换为数组
+      console.log("getFormat");
+      console.log(str1);
+      return str1;
+    }
+  },
+  computed: {
+    varSelectedOptions: {
+      get: function() {
+      if(this.syncAdcode != null){
+         var str = this.syncAdcode;
+         return str;
+      }else{
+        var str = this.areaAdcode;
+        str = str.replace(/\"/g, ""); //去掉双引号
+        str = str.replace(/\s/g, ""); //去掉文中空格
+        var str1 = str.split(","); //将其转换为数组
+        return str1;
+      }
+      },      
+      set: function(value) {
+        console.log("value");
+      }
+
+    }
+
+
+  }
+};
+</script>
+
+<!-- Add "scoped" attribute to limit CSS to this component only -->
+<style scoped>
+</style>
